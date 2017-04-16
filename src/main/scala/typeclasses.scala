@@ -92,6 +92,10 @@ object exercise3 {
     }
     def zero: Node = Root
   }
+  // implicit val MonoidNode: Monoid[Node] = new Monoid[Node] {
+  //   def append(v1: Node, v2: Node): Node = ???
+  //   val zero: Node = Root
+  // }
 }
 
 object exercise4 {
