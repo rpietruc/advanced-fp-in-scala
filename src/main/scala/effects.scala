@@ -280,7 +280,7 @@ object myexercise2 {
     def out = handle
   }
   case class WriteLine[A](in: String, a: A) extends ConsoleOp[String, Unit, A] {
-    def out = _ => a
+    def out = { println(in); _ => a }
   }
 
   // def readLine: ConsoleIO[String] = Free.liftF(
@@ -434,14 +434,13 @@ object exercise3 {
 
   object Semigroup {
     def apply[A](implicit S: Semigroup[A]): Semigroup[A] = S
+
     implicit val stringSemigroup: Semigroup[String] = new Semigroup[String] {
       def append(a1: String, a2: String): String = a1 + a2
     }
-    // ???
-    // ???
-    // implicit def numericSemigroup[A: Numeric]: Semigroup[A] = new Semigroup[A] {
-    //   def append(a1: A, a2: A): A = implicitly(Numeric)(a1.plus(a2))
-    // }
+    implicit def numericSemigroup[A: Numeric]: Semigroup[A] = new Semigroup[A] {
+      def append(a1: A, a2: A): A = implicitly[Numeric[A]].plus(a1, a2)
+    }
   }
 
   trait Partitionable[F[_]] {
@@ -457,9 +456,12 @@ object exercise3 {
       }
     }
   }
-  // implicit class SemigroupSyntax[A](a: A) extends AnyVal {
-  //   def <> (that: A)(implicit S: Semigroup[A]): A = S.append(a, that)
-  // }
+  implicit class SemigroupSyntax[A](val a: A) extends AnyVal {
+    def <>(that: A)(implicit S: Semigroup[A]): A = S.append(a, that)
+  }
+
+  1 <> 2
+  "a" <> "bb"
 
   //covariant endofuntor === functor
   //identity law: map(fa)(id) == fa
@@ -467,28 +469,27 @@ object exercise3 {
   trait Functor[F[_]] {
     def map[A, B](fa: F[A])(f: A => B): F[B]
   }
-  // object Functor {
-  //   implicit val optionFunctor: Functor[Option] = new Functor[Option] {
-  //     def map[A, B](fa: Option[A])(f: A => B): Option[B] = fa match {
-  //       case Some(a) => Some(f(a))
-  //       case None => None
-  //     }
-  //   }
-  // }
+  implicit val optionFunctor: Functor[Option] = new Functor[Option] {
+    def map[A, B](fa: Option[A])(f: A => B): Option[B] = fa match {
+      case Some(a) => Some(f(a))
+      case None => None
+    }
+  }
   //combine 2 futures from any may fail
   trait Apply[F[_]] extends Functor[F] {
     def zip[A, B](fa: F[A], fb: F[B]): F[(A, B)]
-    // def ap[A, B](fab: F[A=> B], fa: F[A]): F[B] =
-    //   map(zip(fab, fa))(t => t._1(t._2))
+    def ap[A, B](fab: F[A=> B], fa: F[A]): F[B] =
+      map(zip(fab, fa))(t => t._1(t._2))
   }
-  // object Apply {
-  //   implicit val optionApply: Apply[Option] = new Apply[Option] {
-  //     def zip[A, B](fa: Option[A], fb: Option[B]): Option[(A, B)] = (fa, fb) match {
-  //       case (Some(a), Some(b)) => Some((a, b))
-  //       case _ => None
-  //     }
-  //   }
-  // }
+  object Apply {
+    implicit val optionApply: Apply[Option] = new Apply[Option] {
+      def zip[A, B](fa: Option[A], fb: Option[B]): Option[(A, B)] = (fa, fb) match {
+        case (Some(a), Some(b)) => Some((a, b))
+        case _ => None
+      }
+      def map[A, B](fa: Option[A])(f: A => B): Option[B] = ???
+    }
+  }
   trait Applicative[F[_]] extends Apply[F] {
     def pure[A](a: A): F[A]
   }
@@ -525,38 +526,43 @@ object exercise3 {
   final case class State[S, A](run: S => (S, A)) {
     def evalState(s: S): A = ???
   }
-  // object State {
-  //   implicit def stateMonad[S]: Monad[State[S, ?]] = new Monad[State[S, ?]] {
-  //     def pure[A](a: A): State[S, A] = State(s => (s, a))
-  //     def get: State[S, S] = State(s => (s, s))
+  object State {
+    implicit def stateMonad[S]: Monad[State[S, ?]] = new Monad[State[S, ?]] {
+      def pure[A](a: A): State[S, A] = State(s => (s, a))
+      def get: State[S, S] = State(s => (s, s))
 
-  //     def modify(f: S => S): State[S, S] = State(
-  //       s => {
-  //         val s2 = f(s)
-  //         (s2, s2)
-  //       })
+      def modify(f: S => S): State[S, S] = State(
+        s => {
+          val s2 = f(s)
+          (s2, s2)
+        })
 
-  //     def zip[A, B](l: State[S, A], r: State[S, B]): State[S, (A, B)] = State[S, (A, B)] {
-  //       s =>
-  //       val (s2, a) = l.run(s)
-  //       val (s3, b) = r.run(s2)
-  //       (s3, (a, b))
-  //     }
-  //     def map[A, B](fa: State[A])(f: A => B): State[B] = fa match {
-  //     }
-  //     def join[A](ffa: State[State[A]]): State[A] = ffa match {
-  //       case Some(Some(a)) => Some(a)
-  //       case _ => None
-  //     }
-  //   }
-  // }
+      def zip[A, B](l: State[S, A], r: State[S, B]): State[S, (A, B)] = State[S, (A, B)] {
+        s =>
+        val (s2, a) = l.run(s)
+        val (s3, b) = r.run(s2)
+        (s3, (a, b))
+      }
+      def map[A, B](fa: State[S, A])(f: A => B): State[S, B] = State[S, B] {
+        s =>
+        val (s2, a) = fa.run(s)
+        (s2, f(a))
+      }
+      def join[A](ffa: State[S, State[S, A]]): State[S, A] = State[S, A] {
+        s =>
+        val (s2, fa) = ffa.run(s)
+        fa.run(s2)
+      }
+    }
+  }
   trait Monoid[A] extends Semigroup[A] {
     def empty: A
   }
   object Monoid {
-    // implicit val stringMonoid: Monoid[String] = new Monoid[String] {
-    //   val empty = ""
-    // }
+    implicit val stringMonoid: Monoid[String] = new Monoid[String] {
+      val empty = ""
+      def append(a1: String, a2: String): String = a1 <> a2
+    }
   }
   trait SerialString[A] {
     def serialize(a: A): String

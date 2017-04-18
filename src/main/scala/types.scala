@@ -63,12 +63,12 @@ object exercise2 {
     //<- to companion object
   }
   Show[Int].show(1)
-  1.show
 
   //to be able to write e.g. 1.show
-  //implicit class ShowSyntax[A: Show](value: A) extends AnyVal {
-  //  def show: String = Show[A].show(value)
-  //}
+  implicit class ShowSyntax[A: Show](value: A) {
+    def show: String = Show[A].show(value)
+  }
+  //1.show
 
   final case class Box[A](value: A)
   object Box {
