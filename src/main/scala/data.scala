@@ -28,6 +28,28 @@ object exercise1 {
   }
 
   // 1. All prime numbers
+  def filter[A](s: Stream[A], p: A => Boolean): Stream[A] =
+  if (p(s.a))
+    Stream(s.a, () => filter(s.as(), p))
+  else
+    filter(s.as(), p)
+
+  def generate[A](a: A, f: A => A): Stream[A] =
+    Stream(a, () => generate(f(a), f))
+
+  def naturalsFrom(k: Int): Stream[Int] =
+    generate(k, _ + 1)
+
+  def naturals: Stream[Int] = {
+    naturalsFrom(0)
+  }
+
+  def primes: Stream[Int] = {
+    def removeNext(s: Stream[Int]): Stream[Int] =
+      Stream(s.a, () => removeNext(filter(s.as(), (i: Int) => i % s.a != 0)))
+    removeNext(naturalsFrom(2))
+  }
+
   // 2. A JSON document
   case class Stats()
   case class Player(stats: Stats, inv: List[Item])
