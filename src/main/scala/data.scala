@@ -24,7 +24,7 @@ object exercise1 {
     def fib(p1: Int, p2: Int): Stream[Int] =
       Stream(p1 + p2, () => fib(p2, p1 + p2))
 
-    fib(0, 1)
+    Stream(0, () => Stream(1, () => fib(0, 1)))
   }
 
   // 1. All prime numbers
